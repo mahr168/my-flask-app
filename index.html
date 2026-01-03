@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sentilyze AI | Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg: #0f172a; --card: #1e293b; --primary: #3b82f6;
+            --success: #10b981; --danger: #ef4444; --text: #f8fafc;
+        }
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: var(--bg); color: var(--text);
+            margin: 0; display: flex; justify-content: center;
+        }
+        .container { width: 100%; max-width: 1000px; padding: 40px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; }
+        .card {
+            background: var(--card); border-radius: 18px; padding: 25px;
+            border: 1px solid #334155; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+        h1 { font-weight: 700; color: var(--primary); margin-bottom: 5px; }
+        p.subtitle { color: #94a3b8; margin-bottom: 30px; }
+        input, textarea {
+            width: 100%; padding: 12px; background: #0f172a; border: 1px solid #334155;
+            border-radius: 10px; color: white; margin-bottom: 15px; box-sizing: border-box;
+        }
+        button {
+            width: 100%; padding: 12px; background: var(--primary); border: none;
+            color: white; font-weight: 700; border-radius: 10px; cursor: pointer;
+        }
+        button:hover { opacity: 0.9; transform: translateY(-1px); }
+        .chart-area { height: 250px; margin-top: 20px; }
+        .status-tag { font-size: 0.7rem; padding: 3px 8px; border-radius: 5px; float: right; }
+        .sim-mode { background: #b45309; color: white; }
+        .live-mode { background: #15803d; color: white; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Sentilyze AI Dashboard</h1>
+    <p class="subtitle">Real-time NLP Sentiment Analysis Engine</p>
+
+    <div class="grid">
+        <div class="card">
+            <span id="statusTag" class="status-tag">Ready</span>
+            <h3>Topic Discovery</h3>
+            <input id="topicIn" placeholder="Enter keyword (e.g. Tesla, iPhone)">
+            <button onclick="analyzeTopic()">Run Analysis</button>
+            <div class="chart-area"><canvas id="myChart"></canvas></div>
+        </div>
+
+        <div class="card">
+            <h3>Text Inspector</h3>
+            <textarea id="textIn" rows="4" placeholder="Paste a review or sentence..."></textarea>
+            <button onclick="analyzeText()">Analyze Polarity</button>
+            <div id="textResult" style="margin-top: 30px; text-align: center; display: none;">
+                <h2 id="sentimentLabel">-</h2>
+                <small id="scoreLabel" style="color: #94a3b8;"></small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let chart;
+
+    async function analyzeTopic() {
+        const topic = document.getElementById("topicIn").value;
+        if(!topic) return;
+        const res = await fetch("/analyze_topic", {
+            method: "POST",
+            headers: {"Content-Type": "application/x-www-form-urlencoded"},
+            body: "topic=" + encodeURIComponent(topic)
+        });
+        const data = await res.json();
+        
+        // Update Status Tag
+        const tag = document.getElementById("statusTag");
+        tag.innerText = data.status.toUpperCase();
+        tag.className = "status-tag " + (data.status === 'live' ? 'live-mode' : 'sim-mode');
+
+        renderChart(data.counts);
+    }
+
+    function renderChart(counts) {
+        const ctx = document.getElementById('myChart').getContext('2d');
+        if (chart) chart.destroy();
+        chart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Positive', 'Negative', 'Neutral'],
+                datasets: [{
+                    data: [counts.Positive, counts.Negative, counts.Neutral],
+                    backgroundColor: ['#10b981', '#ef4444', '#64748b'],
+                    borderWidth: 0
+                }]
+            },
+            options: { plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8' } } } }
+        });
+    }
+
+    async function analyzeText() {
+        const text = document.getElementById("textIn").value;
+        if(!text) return;
+        const res = await fetch("/analyze_text", {
+            method: "POST",
+            headers: {"Content-Type": "application/x-www-form-urlencoded"},
+            body: "text=" + encodeURIComponent(text)
+        });
+        const data = await res.json();
+        
+        const resDiv = document.getElementById("textResult");
+        const label = document.getElementById("sentimentLabel");
+        resDiv.style.display = "block";
+        label.innerText = data.sentiment;
+        label.style.color = data.sentiment === 'Positive' ? '#10b981' : (data.sentiment === 'Negative' ? '#ef4444' : '#94a3b8');
+        document.getElementById("scoreLabel").innerText = "Compound Score: " + data.scores.compound;
+    }
+</script>
+</body>
+</html>
